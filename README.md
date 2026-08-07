@@ -3,6 +3,9 @@
 A local [Paper](https://papermc.io/) Minecraft server, set up as the foundation for a long-term
 plugin development project.
 
+**Further reading:** [OPERATIONS.md](OPERATIONS.md) — directory internals, config files, backups,
+world resets, performance. [ADMIN-PANEL.md](ADMIN-PANEL.md) — building a web panel to manage it.
+
 - **Server software:** Paper 26.2, build 103 (stable channel, released 2026-08-07)
 - **Minecraft version:** 26.2
 - **Java:** 26.0.2 (Paper 26.1+ requires **Java 25** or newer)
