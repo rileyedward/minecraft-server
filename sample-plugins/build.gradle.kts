@@ -11,14 +11,24 @@ repositories {
     maven("https://repo.papermc.io/repository/maven-public/")
 }
 
+// The Paper version lives in ../paper.env so the server jar and the API we
+// compile against can never drift apart. Compiling against a different build
+// than you run is a classic source of NoSuchMethodError at runtime.
+val paperEnv = rootProject.file("../paper.env")
+require(paperEnv.exists()) {
+    "Missing ${paperEnv.path} — it holds the Paper version shared with start.sh"
+}
+val paperApiVersion: String = paperEnv.readLines()
+    .firstOrNull { it.trimStart().startsWith("PAPER_API_VERSION=") }
+    ?.substringAfter("=")
+    ?.trim()
+    ?: error("PAPER_API_VERSION not set in ${paperEnv.path}")
+
 dependencies {
     // `compileOnly`, NOT `implementation`. The server already provides the Paper
     // API at runtime — bundling it into your jar would ship a second, conflicting
     // copy of every Bukkit class. This is the single most common beginner mistake.
-    //
-    // The build number here (103) matches the server jar in the parent directory.
-    // When you update the server, update this too so you compile against the same API.
-    compileOnly("io.papermc.paper:paper-api:26.2.build.103-stable")
+    compileOnly("io.papermc.paper:paper-api:$paperApiVersion")
 }
 
 tasks.withType<JavaCompile>().configureEach {

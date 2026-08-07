@@ -246,9 +246,11 @@ curl -s https://fill.papermc.io/v3/projects/paper/versions/26.2/builds/latest
 
 # 2. Download and verify the checksum (see README setup section)
 
-# 3. Update the filename in start.sh
-# 4. Update the API version in sample-plugins/build.gradle.kts to match
+# 3. Edit paper.env — the only place the version is declared
 ```
+
+`start.sh` and `sample-plugins/build.gradle.kts` both read `paper.env`, so there's nothing else to
+change. If the jar named there isn't present, `start.sh` says so instead of failing obscurely.
 
 Back up `world/` before a version upgrade — worlds are migrated forward on first load and cannot
 be migrated back. A downgrade after an upgrade means restoring from a backup.

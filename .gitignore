@@ -46,6 +46,11 @@ world_nether/
 world_the_end/
 */session.lock
 
+# ── Backups ──────────────────────────────────────────────────
+# World archives are large and binary. Keep the folder, never the contents.
+backups/*
+!backups/.gitkeep
+
 # ── Logs ─────────────────────────────────────────────────────
 logs/
 *.log

@@ -247,6 +247,9 @@ minecraft-server/
 ├── eula.txt                  # EULA acceptance (eula=true)
 ├── server.properties         # core server settings
 │
+├── paper.env                 # Paper version — single source of truth
+├── backups/                  # world archives (contents gitignored)
+│
 ├── sample-plugins/           # ← plugin SOURCE (Gradle project) — see Plugin development
 │
 ├── plugins/                  # ← compiled plugin .jar files load from here
@@ -313,6 +316,31 @@ port can log in as anyone. Keep it on.
 Changes to `server.properties` require a restart to take effect.
 
 ---
+
+## Community plugins
+
+Download the jar and drop it in `plugins/`, then restart. Everything in `plugins/` is gitignored,
+so third-party jars stay out of the repo — they're other people's binaries with their own licenses.
+
+Your own builds live alongside them without conflict: `./gradlew deploy` writes only
+`SamplePlugins.jar` and touches nothing else in the folder.
+
+## Updating Paper
+
+The version lives in **`paper.env`** and nothing else:
+
+```properties
+PAPER_MC_VERSION=26.2
+PAPER_BUILD=103
+PAPER_API_VERSION=26.2.build.103-stable
+```
+
+Both `start.sh` and `sample-plugins/build.gradle.kts` read it, so the server and the API you
+compile against can't drift apart — compiling against a different build than you run is a classic
+source of `NoSuchMethodError` at runtime.
+
+To update: find the new build, download and checksum the jar (see setup above), then edit these
+three values. `start.sh` fails with a clear message if the jar named by `paper.env` isn't present.
 
 ## Plugin development
 

@@ -3,8 +3,22 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-JAR="paper-26.2-103.jar"
+# Version comes from paper.env — the single source of truth, shared with
+# sample-plugins/build.gradle.kts so the server and the plugin API can't drift.
+# shellcheck source=paper.env
+source ./paper.env
+JAR="paper-${PAPER_MC_VERSION}-${PAPER_BUILD}.jar"
 PORT=25565
+
+if [ ! -f "$JAR" ]; then
+  echo "Missing $JAR"
+  echo
+  echo "paper.env says version ${PAPER_MC_VERSION}, build ${PAPER_BUILD}, but that"
+  echo "jar isn't here. Either download it (see README.md → Installing from"
+  echo "scratch) or correct paper.env to match the jar you have:"
+  ls -1 paper-*.jar 2>/dev/null | sed 's/^/  /' || echo "  (no paper jars found)"
+  exit 1
+fi
 
 # ── Pre-flight: is a server already running? ──────────────────────────────────
 # Minecraft locks world/session.lock so two processes can never write the same
