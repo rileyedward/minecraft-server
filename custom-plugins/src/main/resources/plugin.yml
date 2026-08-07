@@ -1,0 +1,6 @@
+name: CustomPlugins
+version: '${version}'          # filled in from build.gradle.kts
+main: com.rileyedward.smp.SmpPlugin
+api-version: '26.2'
+description: Custom features for this server.
+author: rileyedward

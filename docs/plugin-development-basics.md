@@ -74,9 +74,9 @@ each `plugin.yml`, finds the class named in `main:`, instantiates it, and calls 
 `plugin.yml` is the closest thing to `composer.json` — metadata plus an entry point:
 
 ```yaml
-name: SamplePlugins
+name: CustomPlugins
 version: '1.0.0'
-main: com.rileyedward.samples.SamplesPlugin   # ← the class to load
+main: com.rileyedward.smp.SmpPlugin           # ← the class to load
 api-version: '26.2'
 ```
 
@@ -178,7 +178,7 @@ There's no database and no ORM. Three options, in increasing order of effort:
 **1. `config.yml`** — settings, not per-player data. Like a `.env` or config file.
 
 ```java
-boolean enabled = getConfig().getBoolean("samples.magic-wand", true);
+boolean enabled = getConfig().getBoolean("features.welcome", true);
 ```
 
 **2. PersistentDataContainer (PDC)** — arbitrary key-value data attached directly to a player,

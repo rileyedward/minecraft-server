@@ -1,0 +1,13 @@
+# ─────────────────────────────────────────────────────────────
+# CustomPlugins configuration
+#
+# One key per feature. Set it to false and restart to turn that feature off
+# without touching code or rebuilding.
+#
+# On first run this is copied to plugins/CustomPlugins/config.yml. Edit THAT
+# copy at runtime — this one is only the default baked into the jar.
+# ─────────────────────────────────────────────────────────────
+
+features:
+  # Custom join/quit messages and a welcome title.
+  welcome: true

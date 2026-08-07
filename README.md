@@ -67,7 +67,7 @@ you have:
 java -version
 ```
 
-If it's missing or older than 21, install a current JDK:
+If it's missing or older than 25, install a current JDK:
 
 ```bash
 brew install openjdk
@@ -250,11 +250,12 @@ minecraft-server/
 ├── paper.env                 # Paper version — single source of truth
 ├── backups/                  # world archives (contents gitignored)
 │
-├── sample-plugins/           # ← plugin SOURCE (Gradle project) — see Plugin development
+├── custom-plugins/           # ← YOUR plugin source (Gradle project) — the active one
+├── sample-plugins/           #   reference-only samples, not deployed
 │
 ├── plugins/                  # ← compiled plugin .jar files load from here
-│   ├── SamplePlugins.jar     #   built by `cd sample-plugins && ./gradlew deploy`
-│   ├── SamplePlugins/        #   its config.yml, written on first run
+│   ├── CustomPlugins.jar     #   built by `cd custom-plugins && ./gradlew deploy`
+│   ├── CustomPlugins/        #   its config.yml, written on first run
 │   ├── bStats/               #   anonymous stats collection (Paper built-in)
 │   └── spark/                #   built-in profiler, for diagnosing lag
 │
@@ -323,7 +324,7 @@ Download the jar and drop it in `plugins/`, then restart. Everything in `plugins
 so third-party jars stay out of the repo — they're other people's binaries with their own licenses.
 
 Your own builds live alongside them without conflict: `./gradlew deploy` writes only
-`SamplePlugins.jar` and touches nothing else in the folder.
+`CustomPlugins.jar` and touches nothing else in the folder.
 
 ## Updating Paper
 
@@ -335,7 +336,7 @@ PAPER_BUILD=103
 PAPER_API_VERSION=26.2.build.103-stable
 ```
 
-Both `start.sh` and `sample-plugins/build.gradle.kts` read it, so the server and the API you
+`start.sh` and both plugin projects' `build.gradle.kts` read it, so the server and the API you
 compile against can't drift apart — compiling against a different build than you run is a classic
 source of `NoSuchMethodError` at runtime.
 
@@ -348,12 +349,22 @@ A plugin is a `.jar` built against the Paper API. On startup Paper reads each ja
 loads the main class, and calls its `onEnable()`. From there your code runs inside the server
 process with full access to the world, players, and entities.
 
-The Gradle project lives in **`sample-plugins/`** and builds `SamplePlugins.jar`.
+There are two projects:
+
+| Project | Builds | Status |
+|---|---|---|
+| **`custom-plugins/`** | `CustomPlugins.jar` | **Your code. This is the one you work in.** |
+| `sample-plugins/` | `SamplePlugins.jar` | Reference only — kept for its worked examples, not deployed |
+
+The samples aren't loaded by the server anymore. The source stays as a reference for four working
+examples (events, commands, persistence, custom items) — see
+[The Magic Wand, Explained](docs/magic-wand-explained.md). Build and deploy it any time you want to
+try them; delete the folder when you no longer need it.
 
 ### Build and deploy
 
 ```bash
-cd sample-plugins
+cd custom-plugins
 ./gradlew deploy        # compiles and copies the jar into ../plugins/
 ```
 
@@ -367,87 +378,98 @@ on first use. Java 25+ is required.
 
 | Choice | Why |
 |---|---|
-| `compileOnly("io.papermc.paper:paper-api:26.2.build.103-stable")` | The server already provides the API. Using `implementation` would bundle a second copy of every Bukkit class into your jar — the most common beginner mistake. |
+| `compileOnly` on `paper-api` | The server already provides the API. Using `implementation` would bundle a second copy of every Bukkit class into your jar — the most common beginner mistake. |
 | `options.release = 25` | `paper-api` is compiled to Java 25 bytecode (class major 69). This cannot be lowered. |
-| `archiveVersion = ""` | Produces `SamplePlugins.jar` with no version suffix, so each deploy overwrites the last. Otherwise `plugins/` accumulates copies and the server loads all of them. |
-| Build number `103` | Matches the server jar. When you update the server, update this to compile against the same API. |
+| `archiveVersion = ""` | Produces `CustomPlugins.jar` with no version suffix, so each deploy overwrites the last. Otherwise `plugins/` accumulates copies and the server loads all of them. |
+| Version read from `../paper.env` | One place to change when updating Paper. |
 
 ### Layout
 
 ```
-sample-plugins/
+custom-plugins/
 ├── build.gradle.kts
 └── src/main/
-    ├── java/com/rileyedward/samples/
-    │   ├── SamplesPlugin.java      ← entry point + the module registration list
-    │   ├── SampleModule.java       ← the module interface (NOT sample code — keep this)
-    │   └── modules/                ← the four samples
+    ├── java/com/rileyedward/smp/
+    │   ├── SmpPlugin.java              ← entry point + the feature list
+    │   ├── core/
+    │   │   └── Feature.java            ← the feature interface
+    │   └── features/
+    │       └── welcome/                ← one package per feature
+    │           └── WelcomeFeature.java
     └── resources/
-        ├── plugin.yml              ← how Paper finds your main class
-        └── config.yml              ← per-module on/off toggles
+        ├── plugin.yml                  ← how Paper finds your main class
+        └── config.yml                  ← per-feature on/off toggles
 ```
 
-### The samples
+**One package per feature.** Each owns its own listeners, commands, and helper classes. It's the
+structure that keeps a growing plugin navigable — you can add twenty features and each stays
+self-contained.
 
-Each demonstrates something you'll reach for constantly:
+Shared code goes under `core/`. When Tree Feller and Vein Miner both want a connected-block
+scanner, that scanner lives in `core/`, not duplicated in each feature.
 
-| Module | Teaches | Try it |
-|---|---|---|
-| `BlockBreakAnnouncerSample` | **Events** — reacting to the world. Handler priority, cancellation, Adventure text. | Break stone (action bar), then diamond ore (server broadcast) |
-| `WelcomeSample` | **Replacing vanilla behavior** — overwriting values the server was about to use. | Join the server |
-| `PlayerStatsSample` | **Commands + persistence** — `BasicCommand`, tab completion, `PersistentDataContainer`. | `/stats`, `/stats <player>` |
-| `MagicWandSample` | **Custom items + effects** — item metadata, PDC tagging, interaction, scheduled tasks, particles. | `/wand`, then right-click |
+### Adding a feature
 
-Between them: listeners, commands, saved data, item metadata, scheduling, and text formatting.
+Three steps:
 
-### Turning samples off, and removing them
-
-Two independent mechanisms.
-
-**Config toggles** — no rebuild needed. Edit `plugins/SamplePlugins/config.yml` and restart:
-
-```yaml
-samples:
-  block-break-announcer: true
-  welcome: false          # this module now logs "Skipping" and does nothing
-```
-
-Note that's the *deployed* copy under `plugins/`, not the source under `src/main/resources/`.
-The source version is only the default written out on first run.
-
-**Deleting for good** — remove the line from `MODULES` in `SamplesPlugin.java` and delete the
-file. Nothing else references it:
+**1.** Create a package under `features/` with a class implementing `Feature`:
 
 ```java
-private static final List<Supplier<SampleModule>> MODULES = List.of(
-        BlockBreakAnnouncerSample::new,  // [SAMPLE] events
-//      WelcomeSample::new,              // ← commented out
-        PlayerStatsSample::new,
-        MagicWandSample::new
+public final class ElevatorFeature implements Feature, Listener {
+    @Override public String id() { return "elevator"; }
+
+    @Override public void enable(JavaPlugin plugin) {
+        plugin.getServer().getPluginManager().registerEvents(this, plugin);
+    }
+    // @EventHandler methods here
+}
+```
+
+**2.** Add one line to `FEATURES` in `SmpPlugin.java`:
+
+```java
+private static final List<Supplier<Feature>> FEATURES = List.of(
+        WelcomeFeature::new,
+        ElevatorFeature::new      // ← new
 );
 ```
 
-`SampleModule.java` is **not** sample code — keep it. Writing your own features as modules is what
-makes the samples deletable without unpicking them from your work. A module owns its own listener
-and command registration, so features can't quietly entangle.
+**3.** Build and restart:
+
+```bash
+cd custom-plugins && ./gradlew deploy && cd .. && ./stop.sh && ./start.sh
+```
+
+Optionally add a toggle to `config.yml` — the key matches `id()`. Features default to enabled, so
+it's not required.
+
+Full walkthrough with more examples: [Creating a New Plugin](docs/creating-a-new-plugin.md).
+
+### Turning a feature off
+
+Edit the **deployed** config at `plugins/CustomPlugins/config.yml` and restart:
+
+```yaml
+features:
+  welcome: false      # logs "Skipping" and does nothing
+```
+
+That's the runtime copy, not the source under `src/main/resources/` — the source version is only
+the default written out on first run.
+
+To remove a feature for good, delete its package and its line in `FEATURES`. Nothing else
+references it.
 
 ### Where to go next
 
+- [Plugin Development Basics](docs/plugin-development-basics.md) — the model, written for a PHP/OOP background
+- [The Magic Wand, Explained](docs/magic-wand-explained.md) — a full feature, line by line
+- [Plugin Ideas](docs/plugin-ideas.md) — a backlog, each with the event it hangs off
 - Browse events: [Paper API javadocs](https://jd.papermc.io/paper/) → `org.bukkit.event`
-- Every sample file opens with a `[SAMPLE]` banner naming the concept it demonstrates
-- The pattern for nearly any feature: listen to an event, change something, give feedback
 
 ---
 
 ## Version control
-
-A `.gitignore` is in place, but no repository has been initialized yet. When you're ready:
-
-```bash
-git init
-git add .
-git commit -m "Initial Paper server setup"
-```
 
 The guiding principle is **version what you author, ignore what the server generates**. Everything
 excluded is reproducible from a fresh run. After `git add .` only these are staged:
@@ -455,10 +477,14 @@ excluded is reproducible from a fresh run. After `git add .` only these are stag
 ```
 .gitignore
 README.md
-start.sh
+docs/
+start.sh, stop.sh
+paper.env
 server.properties.example
 plugins/.gitkeep
-sample-plugins/            # source, build scripts, and the Gradle wrapper
+backups/.gitkeep
+custom-plugins/            # source, build scripts, and the Gradle wrapper
+sample-plugins/            # same, kept as reference
 ```
 
 Plugin *source* is tracked; the *compiled* jar in `plugins/` is not — it's a build artifact,

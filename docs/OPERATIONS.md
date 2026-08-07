@@ -13,7 +13,7 @@ Every file here falls into one of two categories:
 
 | | |
 |---|---|
-| **Authored** — you write it, git tracks it | `start.sh`, `stop.sh`, `README.md`, `sample-plugins/` |
+| **Authored** — you write it, git tracks it | `start.sh`, `stop.sh`, `README.md`, `custom-plugins/` |
 | **Generated** — the server creates it, reproducible | `cache/`, `libraries/`, `versions/`, `logs/`, `world/`, most configs |
 
 The generated side is ~165 MB of downloads plus your world. Knowing which is which tells you what's
@@ -87,7 +87,7 @@ zgrep -i "someplayer" logs/*.log.gz        # search history
 
 ### `plugins/`
 
-Compiled `.jar` files, plus a data folder per plugin (`plugins/SamplePlugins/config.yml`).
+Compiled `.jar` files, plus a data folder per plugin (`plugins/CustomPlugins/config.yml`).
 Deleting a plugin means deleting both. Deleting only the jar leaves its config orphaned but
 harmless.
 
@@ -249,7 +249,7 @@ curl -s https://fill.papermc.io/v3/projects/paper/versions/26.2/builds/latest
 # 3. Edit paper.env — the only place the version is declared
 ```
 
-`start.sh` and `sample-plugins/build.gradle.kts` both read `paper.env`, so there's nothing else to
+`start.sh` and both plugin projects' `build.gradle.kts` read `paper.env`, so there's nothing else to
 change. If the jar named there isn't present, `start.sh` says so instead of failing obscurely.
 
 Back up `world/` before a version upgrade — worlds are migrated forward on first load and cannot

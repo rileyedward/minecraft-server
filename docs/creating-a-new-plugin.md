@@ -7,30 +7,30 @@ more often than people expect.
 
 ## Which path?
 
-| | Add a module | New standalone plugin |
+| | Add a feature | New standalone plugin |
 |---|---|---|
 | **Effort** | 2 files touched | A new Gradle project |
-| **Ships as** | Part of `SamplePlugins.jar` | Its own jar |
+| **Ships as** | Part of `CustomPlugins.jar` | Its own jar |
 | **Shares code** | Just call the method | Needs `depend:` + the services API |
 | **Use when** | Almost always | It must run on a *different* server without the rest |
 
-New features go in as modules. Split one out later if it earns it — the module boundary is already
-the seam, so waiting costs you nothing.
+New work goes in as a feature of `custom-plugins/`. Split one out later if it earns it — the
+feature boundary is already the seam, so waiting costs you nothing.
 
 ---
 
-# Path A: Add a module
+# Path A: Add a feature
 
 Worked example: a `/spawn` command that teleports you to the world spawn.
 
 ## 1. Create the file
 
-`sample-plugins/src/main/java/com/rileyedward/samples/modules/SpawnModule.java`
+`custom-plugins/src/main/java/com/rileyedward/smp/features/spawn/SpawnFeature.java`
 
 ```java
-package com.rileyedward.samples.modules;
+package com.rileyedward.smp.features.spawn;
 
-import com.rileyedward.samples.SampleModule;
+import com.rileyedward.smp.core.Feature;
 import io.papermc.paper.command.brigadier.BasicCommand;
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import net.kyori.adventure.text.Component;
@@ -39,7 +39,7 @@ import org.bukkit.Sound;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 
-public final class SpawnModule implements SampleModule, BasicCommand {
+public final class SpawnFeature implements Feature, BasicCommand {
 
     @Override
     public String id() {
@@ -66,19 +66,19 @@ public final class SpawnModule implements SampleModule, BasicCommand {
 }
 ```
 
-No `Listener` here — this module has no event handlers, only a command. Implement only what you use.
+No `Listener` here — this feature has no event handlers, only a command. Implement only what you use.
+
+Its own package (`features/spawn/`) even though it's one file. When the feature grows a listener, a
+config class, or helpers, they have somewhere to live that isn't a shared dumping ground.
 
 ## 2. Register it
 
-In `SamplesPlugin.java`, add one line to `MODULES`:
+In `SmpPlugin.java`, add one line to `FEATURES`:
 
 ```java
-private static final List<Supplier<SampleModule>> MODULES = List.of(
-        BlockBreakAnnouncerSample::new,
-        WelcomeSample::new,
-        PlayerStatsSample::new,
-        MagicWandSample::new,
-        SpawnModule::new              // ← your new module
+private static final List<Supplier<Feature>> FEATURES = List.of(
+        WelcomeFeature::new,
+        SpawnFeature::new             // ← your new feature
 );
 ```
 
@@ -87,7 +87,7 @@ Add the import at the top. That's the whole wiring.
 ## 3. Build and run
 
 ```bash
-cd sample-plugins && ./gradlew deploy
+cd custom-plugins && ./gradlew deploy
 cd .. && ./stop.sh && ./start.sh
 ```
 
@@ -96,21 +96,21 @@ Join and type `/spawn`.
 Optionally add a toggle to `config.yml` — the key matches `id()`:
 
 ```yaml
-samples:
+features:
   spawn: true
 ```
 
-Not required. Modules default to enabled.
+Not required. Features default to enabled.
 
 ---
 
 ## Adding an event to it
 
-Modules commonly grow from one command into a small feature. To add an event handler, implement
+Features commonly grow from one command into something larger. To add an event handler, implement
 `Listener` and register:
 
 ```java
-public final class SpawnModule implements SampleModule, Listener, BasicCommand {
+public final class SpawnFeature implements Feature, Listener, BasicCommand {
 
     @Override
     public void enable(JavaPlugin plugin) {
@@ -137,12 +137,12 @@ Only when it genuinely needs to ship separately. It's four scaffolding files.
 
 ## 1. Directory
 
-Alongside `sample-plugins/`, not inside `plugins/` — that folder is for compiled jars only:
+Alongside `custom-plugins/`, not inside `plugins/` — that folder is for compiled jars only:
 
 ```
 minecraft-server/
 ├── plugins/           ← jars land here
-├── sample-plugins/
+├── custom-plugins/
 └── my-plugin/         ← new
 ```
 
@@ -169,7 +169,7 @@ repositories {
 
 dependencies {
     // compileOnly, NOT implementation — the server already provides this.
-    compileOnly("io.papermc.paper:paper-api:26.2.build.103-stable")
+    compileOnly("io.papermc.paper:paper-api:26.2.build.103-stable")  // or read ../paper.env
 }
 
 tasks.withType<JavaCompile>().configureEach {
@@ -274,7 +274,7 @@ stack trace, and the cause is usually in the first few lines.
 ## Iterating
 
 ```bash
-cd sample-plugins && ./gradlew deploy && cd .. && ./stop.sh && ./start.sh
+cd custom-plugins && ./gradlew deploy && cd .. && ./stop.sh && ./start.sh
 ```
 
 Restart every time. `/reload` exists, appears to work, and is a well-known source of bugs that
