@@ -10,6 +10,7 @@ plugin development project.
 | [Plugin Development Basics](docs/plugin-development-basics.md) | How plugin development works, start here if you're new |
 | [The Magic Wand, Explained](docs/magic-wand-explained.md) | A full walkthrough of one plugin, line by line |
 | [Creating a New Plugin](docs/creating-a-new-plugin.md) | Step by step, from empty file to running in game |
+| [Plugin Ideas](docs/plugin-ideas.md) | Backlog of features worth building, with the event each hangs off |
 | [Operations](docs/OPERATIONS.md) | Directory internals, config files, backups, world resets, performance |
 | [Admin Panel](docs/ADMIN-PANEL.md) | Building a web panel to manage the server |
 
