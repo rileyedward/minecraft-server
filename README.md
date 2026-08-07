@@ -143,21 +143,49 @@ Done (8.917s)! For help, type "help"
 ./start.sh
 ```
 
-**Stop** — type this into the server console:
+**Stop** — either type this into the server console:
 
 ```
 stop
 ```
 
-Use `stop`, not Ctrl+C. `stop` flushes all loaded chunks and player data to disk and closes the
-world cleanly. Killing the process can leave the world corrupted or roll back recent changes.
+…or, from any other terminal:
+
+```bash
+./stop.sh
+```
+
+Use one of those, not Ctrl+C. Both flush every loaded chunk and player to disk, close the world
+cleanly, and release the lock. Killing the process outright can roll back recent changes.
+
+`stop.sh` exists for the common case where the server is running in another window, or in the
+background where you have no console to type into.
+
+### Only one server at a time
+
+Minecraft locks `world/session.lock` so two processes can never write the same world. If a server
+is already running, `start.sh` now detects it up front rather than letting you hit a stack trace:
+
+```
+A server is already running on port 25565 (PID 69205).
+Only one server can use the world at a time.
+
+Stop it and restart? [y/N]
+```
+
+Answer `y` and it stops the old one cleanly and starts fresh. Run non-interactively (from a script
+or another tool) it won't guess — it prints `Stop it first: ./stop.sh` and exits 1.
 
 ### What `start.sh` does
 
+Past the pre-flight check, the actual launch is one line:
+
 ```bash
-java -Xms2G -Xmx4G -jar paper-26.2-103.jar --nogui
+exec java -Xms2G -Xmx4G -jar paper-26.2-103.jar --nogui
 ```
 
+- `exec` — replaces the shell with Java so signals reach the server directly. Without it, `kill`
+  on the script leaves Java orphaned and still holding the world lock.
 - `-Xms2G` — allocate 2 GB of heap immediately at startup
 - `-Xmx4G` — allow the heap to grow to at most 4 GB
 - `--nogui` — don't open Mojang's little Swing window; run in the terminal
@@ -456,7 +484,19 @@ lsof -nP -iTCP:25565 -sTCP:LISTEN
 **`Failed to start the minecraft server` … `session.lock: already locked`**
 A server is *already running* and holding this world. Minecraft locks `world/session.lock` so two
 processes can never write the same chunks — this error is the safety mechanism working, not a
-corruption. Find the running server and stop it:
+corruption.
+
+**The fix is one command:**
+
+```bash
+./stop.sh && ./start.sh
+```
+
+`start.sh` now catches this before Java even launches, so you should see a plain-English prompt
+rather than this stack trace. If you're seeing the trace, you started the server some other way
+(`java -jar ...` directly, or an old copy of the script).
+
+To inspect it manually:
 
 ```bash
 lsof -nP -iTCP:25565 -sTCP:LISTEN          # what's on the port
@@ -466,6 +506,10 @@ ps -eo pid,etime,command | grep [p]aper    # the server process
 If it has a console, type `stop` there. Otherwise `kill -TERM <pid>` — Paper's shutdown hook runs
 on SIGTERM and saves the world properly. Confirm it saved by looking for `All dimensions are
 saved` in the log, then start again.
+
+**Why this keeps happening:** a server started in a background window, or by a tool, has no
+console you can type `stop` into — so it's easy to forget it's alive. `lsof -nP -iTCP:25565
+-sTCP:LISTEN` is the quickest way to check before starting.
 
 If the lock persists with genuinely no server running (only happens after a hard crash or power
 loss), delete `world/session.lock` — it's regenerated on startup. Never delete it to bypass a
