@@ -1,0 +1,22 @@
+# ─────────────────────────────────────────────────────────────
+# SamplePlugins configuration
+#
+# Every entry below is a [SAMPLE] module. Set one to false and restart to turn
+# it off without touching code or rebuilding.
+#
+# This file is copied into plugins/SamplePlugins/config.yml on first run. Edit
+# THAT copy at runtime — this one is only the default baked into the jar.
+# ─────────────────────────────────────────────────────────────
+
+samples:
+  # Announces notable blocks to chat, common ones to your action bar.
+  block-break-announcer: true
+
+  # Replaces the vanilla join/quit messages and shows a title on join.
+  welcome: true
+
+  # Tracks blocks broken/placed per player. Adds /stats.
+  player-stats: true
+
+  # Adds /wand, which grants a right-clickable launching item.
+  magic-wand: true

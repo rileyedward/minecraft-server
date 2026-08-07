@@ -19,7 +19,9 @@ paper-*.jar
 *.class
 # ...except the Gradle wrapper jar, which IS meant to be committed
 # so anyone cloning can build without installing Gradle first.
-!gradle/wrapper/gradle-wrapper.jar
+# The **/ prefix matters: a pattern containing a slash is anchored to the repo
+# root, so plain `gradle/wrapper/...` would miss sample-plugins/gradle/wrapper/.
+!**/gradle/wrapper/gradle-wrapper.jar
 
 # ── Paper's downloaded/patched runtime (~165 MB) ─────────────
 # Regenerated automatically on first run: Paper fetches Mojang's

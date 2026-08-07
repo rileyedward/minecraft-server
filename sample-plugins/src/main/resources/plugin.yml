@@ -1,0 +1,13 @@
+# Every plugin needs this file. The server reads it to find your main class.
+# Without it, your jar is just a jar and Paper ignores it.
+name: SamplePlugins
+version: '${version}'          # filled in from build.gradle.kts
+main: com.rileyedward.samples.SamplesPlugin
+api-version: '26.2'            # the Minecraft version this targets
+description: Starter samples demonstrating core Paper plugin development.
+author: rileyedward
+
+# Note: there is no `commands:` section here. Modern Paper registers commands in
+# code via registerCommand() — see PlayerStatsSample and MagicWandSample. Older
+# tutorials will tell you to declare them here; that still works, but the code
+# approach keeps a command's definition next to its implementation.

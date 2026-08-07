@@ -5,7 +5,7 @@ plugin development project.
 
 - **Server software:** Paper 26.2, build 103 (stable channel, released 2026-08-07)
 - **Minecraft version:** 26.2
-- **Java:** 26.0.2 (Paper 26.2 requires Java 21 or newer)
+- **Java:** 26.0.2 (Paper 26.1+ requires **Java 25** or newer)
 - **Port:** 25565
 - **Platform set up on:** macOS (Apple Silicon)
 
@@ -48,7 +48,9 @@ mechanics, world management), but it *is* a boundary.
 
 ## Prerequisites
 
-**Java 21 or newer.** Check what you have:
+**Java 25 or newer.** Paper 26.1+ requires it, and the `paper-api` jar is compiled to Java 25
+bytecode — so this is a hard floor for both running the server and building plugins. Check what
+you have:
 
 ```bash
 java -version
@@ -206,7 +208,11 @@ minecraft-server/
 ├── eula.txt                  # EULA acceptance (eula=true)
 ├── server.properties         # core server settings
 │
-├── plugins/                  # ← your compiled plugin .jar files go here
+├── sample-plugins/           # ← plugin SOURCE (Gradle project) — see Plugin development
+│
+├── plugins/                  # ← compiled plugin .jar files load from here
+│   ├── SamplePlugins.jar     #   built by `cd sample-plugins && ./gradlew deploy`
+│   ├── SamplePlugins/        #   its config.yml, written on first run
 │   ├── bStats/               #   anonymous stats collection (Paper built-in)
 │   └── spark/                #   built-in profiler, for diagnosing lag
 │
@@ -271,25 +277,98 @@ Changes to `server.properties` require a restart to take effect.
 
 ## Plugin development
 
-Not set up yet — this is the next step. The shape of it:
-
-A plugin is a `.jar` built against the Paper API. You write Java (or Kotlin), compile with
-Gradle or Maven, and drop the resulting jar into `plugins/`. On startup Paper reads each jar's
-`plugin.yml`, loads the main class, and calls its `onEnable()`.
-
-From there you register event listeners and commands, and your code runs inside the server
+A plugin is a `.jar` built against the Paper API. On startup Paper reads each jar's `plugin.yml`,
+loads the main class, and calls its `onEnable()`. From there your code runs inside the server
 process with full access to the world, players, and entities.
 
-The typical project setup:
+The Gradle project lives in **`sample-plugins/`** and builds `SamplePlugins.jar`.
 
-- **Gradle** with the `paperweight-userdev` plugin
-- **Java 21** as the target, matching Paper's baseline
-- The Paper API as a `compileOnly` dependency — the server provides it at runtime
-- A build task that copies the output jar directly into this `plugins/` folder, so the loop is
-  build → restart → test
+### Build and deploy
 
-Restarting is the reliable way to load changes. `/reload` exists but is genuinely unreliable and
-a well-known source of confusing bugs — avoid the habit.
+```bash
+cd sample-plugins
+./gradlew deploy        # compiles and copies the jar into ../plugins/
+```
+
+Then restart the server (`stop`, then `./start.sh`). **Restart rather than `/reload`** — `/reload`
+is a well-known source of confusing bugs.
+
+You do not need Gradle installed. The committed `gradlew` wrapper downloads the correct version
+on first use. Java 25+ is required.
+
+### How the project is set up
+
+| Choice | Why |
+|---|---|
+| `compileOnly("io.papermc.paper:paper-api:26.2.build.103-stable")` | The server already provides the API. Using `implementation` would bundle a second copy of every Bukkit class into your jar — the most common beginner mistake. |
+| `options.release = 25` | `paper-api` is compiled to Java 25 bytecode (class major 69). This cannot be lowered. |
+| `archiveVersion = ""` | Produces `SamplePlugins.jar` with no version suffix, so each deploy overwrites the last. Otherwise `plugins/` accumulates copies and the server loads all of them. |
+| Build number `103` | Matches the server jar. When you update the server, update this to compile against the same API. |
+
+### Layout
+
+```
+sample-plugins/
+├── build.gradle.kts
+└── src/main/
+    ├── java/com/rileyedward/samples/
+    │   ├── SamplesPlugin.java      ← entry point + the module registration list
+    │   ├── SampleModule.java       ← the module interface (NOT sample code — keep this)
+    │   └── modules/                ← the four samples
+    └── resources/
+        ├── plugin.yml              ← how Paper finds your main class
+        └── config.yml              ← per-module on/off toggles
+```
+
+### The samples
+
+Each demonstrates something you'll reach for constantly:
+
+| Module | Teaches | Try it |
+|---|---|---|
+| `BlockBreakAnnouncerSample` | **Events** — reacting to the world. Handler priority, cancellation, Adventure text. | Break stone (action bar), then diamond ore (server broadcast) |
+| `WelcomeSample` | **Replacing vanilla behavior** — overwriting values the server was about to use. | Join the server |
+| `PlayerStatsSample` | **Commands + persistence** — `BasicCommand`, tab completion, `PersistentDataContainer`. | `/stats`, `/stats <player>` |
+| `MagicWandSample` | **Custom items + effects** — item metadata, PDC tagging, interaction, scheduled tasks, particles. | `/wand`, then right-click |
+
+Between them: listeners, commands, saved data, item metadata, scheduling, and text formatting.
+
+### Turning samples off, and removing them
+
+Two independent mechanisms.
+
+**Config toggles** — no rebuild needed. Edit `plugins/SamplePlugins/config.yml` and restart:
+
+```yaml
+samples:
+  block-break-announcer: true
+  welcome: false          # this module now logs "Skipping" and does nothing
+```
+
+Note that's the *deployed* copy under `plugins/`, not the source under `src/main/resources/`.
+The source version is only the default written out on first run.
+
+**Deleting for good** — remove the line from `MODULES` in `SamplesPlugin.java` and delete the
+file. Nothing else references it:
+
+```java
+private static final List<Supplier<SampleModule>> MODULES = List.of(
+        BlockBreakAnnouncerSample::new,  // [SAMPLE] events
+//      WelcomeSample::new,              // ← commented out
+        PlayerStatsSample::new,
+        MagicWandSample::new
+);
+```
+
+`SampleModule.java` is **not** sample code — keep it. Writing your own features as modules is what
+makes the samples deletable without unpicking them from your work. A module owns its own listener
+and command registration, so features can't quietly entangle.
+
+### Where to go next
+
+- Browse events: [Paper API javadocs](https://jd.papermc.io/paper/) → `org.bukkit.event`
+- Every sample file opens with a `[SAMPLE]` banner naming the concept it demonstrates
+- The pattern for nearly any feature: listen to an event, change something, give feedback
 
 ---
 
@@ -312,7 +391,16 @@ README.md
 start.sh
 server.properties.example
 plugins/.gitkeep
+sample-plugins/            # source, build scripts, and the Gradle wrapper
 ```
+
+Plugin *source* is tracked; the *compiled* jar in `plugins/` is not — it's a build artifact,
+rebuilt with `./gradlew deploy`. Same for `sample-plugins/build/` and `.gradle/`.
+
+The Gradle wrapper (`gradlew`, `gradle/wrapper/`) **is** committed deliberately, so a fresh clone
+can build without installing Gradle. The `.gitignore` needs `!**/gradle/wrapper/gradle-wrapper.jar`
+rather than `!gradle/wrapper/...` for this — a pattern containing a slash is anchored to the repo
+root and would miss the nested copy.
 
 Notable exclusions and why:
 
@@ -356,7 +444,7 @@ Client and server versions don't match. The server is 26.2; set your Minecraft i
 26.2 exactly.
 
 **`UnsupportedClassVersionError` on startup**
-Java is too old. Paper 26.2 needs Java 21+. Check with `java -version`.
+Java is too old. Paper 26.1+ needs Java 25 or newer. Check with `java -version`.
 
 **"Failed to bind to port"**
 Something already holds 25565 — most likely a server you forgot to stop. Find it:
