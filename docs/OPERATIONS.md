@@ -244,7 +244,7 @@ only `world/dimensions/minecraft/the_nether/` while the server is stopped.
 # 1. Find the current build
 curl -s https://fill.papermc.io/v3/projects/paper/versions/26.2/builds/latest
 
-# 2. Download and verify the checksum (see README setup section)
+# 2. Download and verify the checksum (see "Installing from scratch" below)
 
 # 3. Edit paper.env — the only place the version is declared
 ```
@@ -280,6 +280,122 @@ It reports exactly which code consumed tick time — including your own plugin.
 
 ---
 
+## Installing from scratch
+
+Only needed when rebuilding on a new machine or upgrading Paper — the repo already contains a
+working server.
+
+**1. Find the current build.** Paper's API tells you the latest build for a given Minecraft version:
+
+```bash
+curl -s https://fill.papermc.io/v3/projects/paper/versions/26.2/builds/latest
+```
+
+Look for `channel: "STABLE"` and pull the URL out of `downloads.server:default.url`, plus the
+`sha256` checksum next to it.
+
+**2. Download it:**
+
+```bash
+curl -o paper-26.2-103.jar "<the url from step 1>"
+```
+
+**3. Verify the checksum** — the jar is 59 MB of code that will run with full access to your
+machine, so confirm it's what Paper actually published:
+
+```bash
+shasum -a 256 paper-26.2-103.jar
+```
+
+The output must match the `sha256` from step 1 exactly. For this build it is:
+
+```
+3a717f68e330212219497cd3e224d76f175f14cc5d474c82a1c7cb354d6eca68
+```
+
+**4. First run.** This will fail on purpose — it exists to generate the config files:
+
+```bash
+java -Xms2G -Xmx4G -jar paper-26.2-103.jar --nogui
+```
+
+You'll see `You need to agree to the EULA in order to run the server.` That's expected. On this
+first pass Paper also downloads the vanilla Mojang server jar and applies its patches to it, which
+is why `cache/`, `libraries/`, and `versions/` appear.
+
+**5. Accept the EULA.** Open `eula.txt` and change `eula=false` to `eula=true`. Doing this is your
+agreement to the [Minecraft EULA](https://aka.ms/MinecraftEULA), so read it first if you haven't.
+
+**6. Start the server** with `./start.sh`. The first real startup generates the world, which takes
+longer than subsequent boots.
+
+Record the new version in `paper.env` so `start.sh` and both plugin projects stay in lockstep.
+
+---
+
+## Version control
+
+The guiding principle is **version what you author, ignore what the server generates**. Everything
+excluded is reproducible from a fresh run. After `git add .` only these are staged:
+
+```
+.gitignore
+README.md
+docs/
+start.sh, stop.sh
+paper.env
+server.properties.example
+plugins/.gitkeep
+backups/.gitkeep
+custom-plugins/            # source, build scripts, and the Gradle wrapper
+sample-plugins/            # same, kept as reference
+```
+
+Plugin *source* is tracked; the *compiled* jar in `plugins/` is not — it's a build artifact, rebuilt
+with `./gradlew deploy`. Same for `build/` and `.gradle/`.
+
+The Gradle wrapper (`gradlew`, `gradle/wrapper/`) **is** committed deliberately, so a fresh clone can
+build without installing Gradle. The `.gitignore` needs `!**/gradle/wrapper/gradle-wrapper.jar`
+rather than `!gradle/wrapper/...` for this — a pattern containing a slash is anchored to the repo
+root and would miss the nested copies.
+
+Notable exclusions and why:
+
+| Excluded | Reason |
+|---|---|
+| `paper-*.jar` | 59 MB. GitHub warns above 50 MB, rejects at 100 MB. Re-download it — the build and checksum are above. |
+| `server.properties` | **Contains secrets** — `management-server-secret` is auto-generated with a live value, and `rcon.password` if you enable RCON. |
+| `world/` | Large, changes every tick, merges catastrophically. Back this up separately; git is the wrong tool. |
+| `cache/`, `libraries/`, `versions/` | ~165 MB Paper downloads and patches on first run. |
+| `ops.json`, `usercache.json`, `banned-ips.json` | Usernames, UUIDs, IP addresses. |
+| `eula.txt` | Accepting the EULA is a personal legal act — let whoever runs the server accept it themselves. |
+| `logs/`, `build/`, `.gradle/`, `.DS_Store` | Churn and local noise. |
+
+### The server.properties problem
+
+Because the real file is ignored, `server.properties.example` is committed in its place — identical
+but with all three credential fields blanked. It documents your settings without leaking anything.
+
+When you change a setting worth keeping, refresh the example:
+
+```bash
+sed -E 's/^(management-server-secret|rcon\.password|management-server-tls-keystore-password)=.*/\1=/' \
+  server.properties > server.properties.example
+```
+
+And when setting up on a new machine, copy it the other way — the server regenerates its own secret
+on first boot:
+
+```bash
+cp server.properties.example server.properties
+```
+
+If you ever *do* want a tuned config tracked, check it for credentials first, then force-add it:
+`git add -f <file>`. Bear in mind that anything committed stays in git history even if you delete it
+later — scrubbing a leaked secret means rewriting history, so it's far easier not to commit it.
+
+---
+
 ## Troubleshooting by symptom
 
 | Symptom | Look at |
@@ -291,3 +407,70 @@ It reports exactly which code consumed tick time — including your own plugin.
 | Lag | `tps`, then `spark profiler start` |
 | Player can't connect | Version mismatch, or `white-list=true` |
 | Corrupt world after a crash | Restore your backup; `level.dat_old` can substitute for a damaged `level.dat` |
+
+### In detail
+
+**"Outdated server!" or "Outdated client!" when connecting**
+Client and server versions don't match. The server is 26.2; set your Minecraft installation to 26.2
+exactly.
+
+**`UnsupportedClassVersionError` on startup**
+Java is too old. Paper 26.1+ needs Java 25 or newer. Check with `java -version`.
+
+**"Failed to bind to port"**
+Something already holds 25565 — most likely a server you forgot to stop:
+
+```bash
+lsof -nP -iTCP:25565 -sTCP:LISTEN
+```
+
+**`Failed to start the minecraft server` … `session.lock: already locked`**
+A server is *already running* and holding this world. Minecraft locks `world/session.lock` so two
+processes can never write the same chunks — this error is the safety mechanism working, not a
+corruption. The fix is one command:
+
+```bash
+./stop.sh && ./start.sh
+```
+
+`start.sh` catches this before Java even launches, so you should see a plain-English prompt rather
+than a stack trace. If you're seeing the trace, the server was started some other way (`java -jar`
+directly, or an old copy of the script).
+
+To inspect it manually:
+
+```bash
+lsof -nP -iTCP:25565 -sTCP:LISTEN          # what's on the port
+ps -eo pid,etime,command | grep [p]aper    # the server process
+```
+
+If it has a console, type `stop` there. Otherwise `kill -TERM <pid>` — Paper's shutdown hook runs on
+SIGTERM and saves the world properly. Confirm it saved by looking for `All dimensions are saved` in
+the log, then start again.
+
+**Why this keeps happening:** a server started in a background window, or by a tool, has no console
+you can type `stop` into — so it's easy to forget it's alive. Checking the port first is the quickest
+guard.
+
+If the lock persists with genuinely no server running (only after a hard crash or power loss), delete
+`world/session.lock` — it's regenerated on startup. Never delete it to bypass a live server.
+
+**`Failed to load eula.txt`**
+`eula.txt` still says `eula=false`. See step 5 of *Installing from scratch* above.
+
+**A plugin isn't loading**
+Read `logs/latest.log`. Plugin load failures print a full stack trace and the reason is almost always
+in it — usually a malformed `plugin.yml` or a version mismatch against the API.
+
+**Server is lagging**
+`spark` is already installed. Run `/spark profiler start` in game, let it collect during the lag,
+then `/spark profiler stop` for a report showing exactly what's consuming tick time.
+
+---
+
+## References
+
+- [Paper documentation](https://docs.papermc.io/)
+- [Paper API javadocs](https://jd.papermc.io/paper/)
+- [Paper plugin development guide](https://docs.papermc.io/paper/dev/)
+- [Minecraft EULA](https://aka.ms/MinecraftEULA)
