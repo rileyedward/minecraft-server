@@ -3,8 +3,15 @@
 A local [Paper](https://papermc.io/) Minecraft server, set up as the foundation for a long-term
 plugin development project.
 
-**Further reading:** [OPERATIONS.md](OPERATIONS.md) — directory internals, config files, backups,
-world resets, performance. [ADMIN-PANEL.md](ADMIN-PANEL.md) — building a web panel to manage it.
+**Further reading — see [docs/](docs/):**
+
+| Doc | Covers |
+|---|---|
+| [Plugin Development Basics](docs/plugin-development-basics.md) | How plugin development works, start here if you're new |
+| [The Magic Wand, Explained](docs/magic-wand-explained.md) | A full walkthrough of one plugin, line by line |
+| [Creating a New Plugin](docs/creating-a-new-plugin.md) | Step by step, from empty file to running in game |
+| [Operations](docs/OPERATIONS.md) | Directory internals, config files, backups, world resets, performance |
+| [Admin Panel](docs/ADMIN-PANEL.md) | Building a web panel to manage the server |
 
 - **Server software:** Paper 26.2, build 103 (stable channel, released 2026-08-07)
 - **Minecraft version:** 26.2

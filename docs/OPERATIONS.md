@@ -3,7 +3,7 @@
 Everything about running and maintaining this server day to day: what each directory is for,
 which config file controls what, and how to perform the common operations safely.
 
-For setup and connecting, see [README.md](README.md).
+For setup and connecting, see the [README](../README.md).
 
 ---
 
