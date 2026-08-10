@@ -265,9 +265,10 @@ The environment argument must be one of `NORMAL`, `NETHER`, `THE_END`, or `CUSTO
 | -------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
 | [Operations](docs/OPERATIONS.md)                               | Running the server day to day — directories, config files, backups, troubleshooting |
 | [Deployment](docs/DEPLOYMENT.md)                               | Putting the server on a DigitalOcean droplet and keeping it updated                 |
+| [Cost optimization](docs/COST-OPTIMIZATION.md)                 | Tuning the server to run on a cheaper droplet — planned, not applied yet            |
 | [Plugin development basics](docs/plugin-development-basics.md) | The Paper API from scratch, written for someone new to Java                         |
 | [Creating a new plugin](docs/creating-a-new-plugin.md)         | Adding a feature to `custom-plugins/`                                               |
 | [The magic wand, explained](docs/magic-wand-explained.md)      | A worked example, walked through line by line                                       |
 | [Plugin ideas](docs/plugin-ideas.md)                           | A backlog of things worth building next                                             |
 | [Admin panel](docs/ADMIN-PANEL.md)                             | Design notes for a web management panel — not built yet                             |
-| [Speedrun world](docs/SPEEDRUN-WORLD.md)                       | Design notes for a resettable hardcore speedrun dimension — not built yet           |
+| [Speedrun world](docs/SPEEDRUN-WORLD.md)                       | The resettable hardcore speedrun dimension — design notes plus what got built       |

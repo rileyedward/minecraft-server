@@ -53,6 +53,17 @@ exec java -Xms2G -Xmx2500M -jar "$JAR" --nogui
 
 Ubuntu 24.04 LTS is a fine base image.
 
+**"Modest view distance" above is doing real work in that table**, and it's the difference between
+the two rows costing roughly $28/mo and $56/mo. Every performance setting on this server is currently
+at its stock default, including `view-distance=10` and `simulation-distance=10` — which is what makes
+the 4 GB row read as marginal rather than comfortable.
+[Cost optimization](COST-OPTIMIZATION.md) works out exactly which settings to change and in what
+order. Read it before paying for the larger tier.
+
+One thing that bears on sizing directly: once `/speedrun` has been used, Multiverse holds **three
+additional always-loaded worlds** on top of `current` and its nether and end. Six loaded worlds for
+five players is the steady state, not the peak.
+
 ---
 
 ## First-time droplet setup
