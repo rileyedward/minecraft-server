@@ -39,11 +39,41 @@ versions/
 server.properties
 
 # ── World data ───────────────────────────────────────────────
-# Large, changes every single tick, and merges catastrophically.
-# Back worlds up separately — git is the wrong tool for them.
+# The live world changes every single tick and merges catastrophically, so it stays
+# out of git. The archived realms are finished history and ARE tracked — see below.
 world/
 world_nether/
 world_the_end/
+
+# Staging folders for importing an old save. `/mv import` consumes these, so they
+# exist only between the copy and the import — but never let one get committed.
+#
+# These need the leading slash. Without it, `old/` matches a directory named `old`
+# at ANY depth, which would silently re-ignore the archived realm below.
+/old/
+/oldest/
+/oldest_nether/
+/oldest_the_end/
+
+# ── current/ — the default world, and every other world too ──
+# On Paper 26.2 a world is a dimension inside the default world's folder, so
+# current/ holds all seven. Ignore it wholesale, then re-include the finished
+# realms so a fresh clone still has them.
+#
+# Each level is unignored on the way down rather than with one `current/` line,
+# because git will not re-include a path inside an already-excluded directory.
+current/*
+!current/dimensions/
+current/dimensions/*
+!current/dimensions/minecraft/
+current/dimensions/minecraft/*
+
+# The archived realms — tracked. `current`'s own overworld/nether/end are not.
+!current/dimensions/minecraft/old/
+!current/dimensions/minecraft/oldest/
+!current/dimensions/minecraft/oldest_nether/
+!current/dimensions/minecraft/oldest_the_end/
+
 */session.lock
 
 # ── Backups ──────────────────────────────────────────────────
