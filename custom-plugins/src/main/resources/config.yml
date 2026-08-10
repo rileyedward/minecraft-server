@@ -15,3 +15,9 @@ features:
   # /wand — a blaze rod that launches you forward on right-click.
   # Requires the smp.wand permission; operators have it automatically.
   wand: true
+
+  # /current, /old, /oldest — jump between the archived realm worlds.
+  # Requires the smp.worlds permission; operators have it automatically.
+  # To let everyone use them:
+  #   /lp group default permission set smp.worlds true
+  worlds: true

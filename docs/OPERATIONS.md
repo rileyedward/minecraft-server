@@ -15,11 +15,11 @@ Every file here falls into one of two categories:
 | | |
 |---|---|
 | **Authored** — you write it, git tracks it | `start.sh`, `stop.sh`, `README.md`, `custom-plugins/` |
-| **Generated** — the server creates it, reproducible | `cache/`, `libraries/`, `versions/`, `logs/`, `world/`, most configs |
+| **Generated** — the server creates it, reproducible | `cache/`, `libraries/`, `versions/`, `logs/`, `current/`, most configs |
 
 The generated side is ~165 MB of downloads plus your world. Knowing which is which tells you what's
 safe to delete when something breaks: **anything generated can be removed and will come back.** The
-sole exception is `world/`, which is generated but irreplaceable — it holds everything players built.
+sole exception is `current/`, which is generated but irreplaceable — it holds everything players built.
 
 ---
 
@@ -46,25 +46,36 @@ copy it fetches on your machine. That's why the first run took longer and printe
 start. Deleting them is a legitimate fix if the server won't boot after a botched update. It costs
 one slow startup.
 
-### `world/` — the irreplaceable one
+### `current/` — the irreplaceable one
+
+The world folder is named after `level-name` in `server.properties`, which on this server is
+`current`.
 
 ```
-world/
+current/
 ├── level.dat              world metadata: seed, spawn point, game rules, world time
 ├── level.dat_old          automatic backup of the above
 ├── session.lock           the "a server is using this" lock
 ├── dimensions/minecraft/
 │   ├── overworld/region/  the actual terrain, as .mca region files
 │   ├── the_nether/
-│   └── the_end/
+│   ├── the_end/
+│   ├── old/               the previous realm — a whole extra world
+│   ├── oldest/            the earliest realm
+│   ├── oldest_nether/
+│   └── oldest_the_end/
 ├── data/                  maps, scoreboards, raids, villages
 ├── datapacks/             vanilla datapacks
 └── players/               one file per player: inventory, position, health, XP
 ```
 
-Note the modern layout — all three dimensions live *inside* `world/`. Older guides describe
-sibling `world_nether/` and `world_the_end/` folders; that's no longer how it works, which makes
-backup and reset simpler since one folder is the whole world.
+Note the modern layout — every dimension lives *inside* `current/`. Older guides describe sibling
+`world_nether/` and `world_the_end/` folders; that's no longer how it works.
+
+**This includes entire additional worlds.** On Paper 26.2 an imported world is stored as another
+entry under `dimensions/minecraft/`, not as a folder beside `current/`. That makes backup simple —
+one folder is every world — but it also means `current/` is much larger than a single world's worth
+of data. See the Worlds section of the README for how the three realms are set up.
 
 Region files (`r.0.0.mca`) each hold a 32×32 chunk area. They grow as players explore and are
 never automatically pruned.
@@ -111,7 +122,7 @@ more specific file wins.**
 | `server.properties` | Core vanilla: port, gamemode, difficulty, max players, MOTD, view distance, online-mode | Restart |
 | `config/paper-global.yml` | Paper server-wide: chunk system, watchdog, packet limits, console, proxies | Restart |
 | `config/paper-world-defaults.yml` | Paper per-world defaults: mob spawning, growth rates, hoppers, entity ticking | Restart |
-| `world/dimensions/minecraft/<dim>/paper-world.yml` | Overrides the above for **one dimension** | Restart |
+| `current/dimensions/minecraft/<dim>/paper-world.yml` | Overrides the above for **one dimension** | Restart |
 | `bukkit.yml` | Legacy: spawn limits, chunk GC, tick intervals | Restart |
 | `spigot.yml` | Legacy: entity activation ranges, item merge radius, messages | Restart |
 | `commands.yml` | Command aliases | Restart |
@@ -125,7 +136,7 @@ more specific file wins.**
 | Render/view distance | `server.properties` (`view-distance`, `simulation-distance`) |
 | Mob spawn caps | `bukkit.yml` → `spawn-limits` |
 | Mob spawn behavior, crop growth, hopper speed | `config/paper-world-defaults.yml` |
-| Nether-only tweak | `world/dimensions/minecraft/the_nether/paper-world.yml` |
+| Nether-only tweak | `current/dimensions/minecraft/the_nether/paper-world.yml` |
 | Lag from too many entities | `spigot.yml` → `entity-activation-range` |
 | Timeout before the watchdog kills a frozen server | `config/paper-global.yml` → `watchdog` |
 
@@ -178,7 +189,7 @@ Type these directly into the terminal running the server (no leading `/`):
 
 ```bash
 ./stop.sh
-tar -czf backups/world-$(date +%Y%m%d-%H%M).tar.gz world/
+tar -czf backups/world-$(date +%Y%m%d-%H%M).tar.gz current/
 ./start.sh
 ```
 
@@ -190,7 +201,7 @@ save-all
 ```
 
 ```bash
-tar -czf backups/world-$(date +%Y%m%d-%H%M).tar.gz world/
+tar -czf backups/world-$(date +%Y%m%d-%H%M).tar.gz current/
 ```
 
 ```
@@ -207,29 +218,32 @@ Back up `plugins/` too if plugin configs matter to you. Skip `cache/`, `librarie
 
 Three approaches, depending on what you want.
 
+> ⚠️ **`current/` is not one world — it is all of them.** Since Paper 26.2 stores imported worlds
+> under `current/dimensions/minecraft/`, deleting `current/` destroys the `old` and `oldest` realms
+> along with the current one. The advice below is written with that in mind.
+
 **Wipe and regenerate with a new random seed:**
 
 ```bash
 ./stop.sh
-rm -rf world/          # ⚠ permanent — back up first if unsure
+rm -rf current/        # ⚠ permanent — this deletes EVERY world, not just the current one
 ./start.sh
 ```
 
-The modern single-folder layout means this removes the nether and end too.
-
-**Keep the old world, start a fresh one alongside it** — safer, and reversible:
+**Keep the existing worlds, start a fresh one alongside them** — safer, and reversible:
 
 ```properties
 # server.properties
 level-name=world2
 ```
 
-The old `world/` stays untouched on disk. Switch back by setting the name again.
+`current/` stays untouched on disk, archived realms and all. Switch back by setting the name again.
+This is the option you almost always want.
 
 **Generate a specific seed:**
 
 ```properties
-level-name=world
+level-name=world2
 level-seed=-1234567890      # or any text, which gets hashed
 ```
 
@@ -237,7 +251,9 @@ The seed only applies when the world is first created — setting it on an exist
 nothing. Pair it with a delete or a new `level-name`.
 
 To reset just *one* dimension (a common trick for refreshing depleted nether resources), delete
-only `world/dimensions/minecraft/the_nether/` while the server is stopped.
+only `current/dimensions/minecraft/the_nether/` while the server is stopped. Note that the same path
+shape is how whole worlds are stored, so check the name carefully before deleting —
+`dimensions/minecraft/oldest/` is a realm, not a dimension of the current world.
 
 ### Update Paper to a new build
 
@@ -253,7 +269,7 @@ curl -s https://fill.papermc.io/v3/projects/paper/versions/26.2/builds/latest
 `start.sh` and both plugin projects' `build.gradle.kts` read `paper.env`, so there's nothing else to
 change. If the jar named there isn't present, `start.sh` says so instead of failing obscurely.
 
-Back up `world/` before a version upgrade — worlds are migrated forward on first load and cannot
+Back up `current/` before a version upgrade — worlds are migrated forward on first load and cannot
 be migrated back. A downgrade after an upgrade means restoring from a backup.
 
 Update the `paper-api` dependency in lockstep so you compile against the API you're running.
@@ -366,11 +382,48 @@ Notable exclusions and why:
 |---|---|
 | `paper-*.jar` | 59 MB. GitHub warns above 50 MB, rejects at 100 MB. Re-download it — the build and checksum are above. |
 | `server.properties` | **Contains secrets** — `management-server-secret` is auto-generated with a live value, and `rcon.password` if you enable RCON. |
-| `world/` | Large, changes every tick, merges catastrophically. Back this up separately; git is the wrong tool. |
+| `current/` — the live world | Changes every tick and merges catastrophically. Back this up separately; git is the wrong tool for a world in active use. **Partial exception:** the archived realms inside it *are* tracked, see below. |
 | `cache/`, `libraries/`, `versions/` | ~165 MB Paper downloads and patches on first run. |
 | `ops.json`, `usercache.json`, `banned-ips.json` | Usernames, UUIDs, IP addresses. |
 | `eula.txt` | Accepting the EULA is a personal legal act — let whoever runs the server accept it themselves. |
 | `logs/`, `build/`, `.gradle/`, `.DS_Store` | Churn and local noise. |
+
+### The archived realms are the one tracked world data
+
+`old`, `oldest`, `oldest_nether`, and `oldest_the_end` are committed — 1.5 GB across 995 files.
+They're finished history, so versioning them means a clone has the realms rather than them existing
+only on one machine.
+
+This is why `.gitignore` can't just say `current/`. Git will not re-include a path inside an
+excluded directory, so each level is unignored on the way down:
+
+```gitignore
+current/*
+!current/dimensions/
+current/dimensions/*
+!current/dimensions/minecraft/
+current/dimensions/minecraft/*
+!current/dimensions/minecraft/old/          # …and the other three
+```
+
+Two traps worth remembering if you add another realm:
+
+- **Anchor the staging patterns.** `/old/` with a leading slash matches only the repo root. Written
+  as `old/` it matches a directory of that name at *any* depth and silently re-ignores the archived
+  realm — the tracked files just vanish from `git status` with no error.
+- **Verify before committing**, since a mistake here is a 1.5 GB commit to undo:
+
+  ```bash
+  git check-ignore -q current/dimensions/minecraft/old/region/r.0.0.mca && echo IGNORED || echo tracked
+  ```
+
+The realms are set to adventure mode with mob spawning off in `plugins/Multiverse-Core/worlds.yml`,
+so walking through them doesn't rewrite region files. That matters because `.mca` files are
+internally compressed and git can't delta them — every rewritten region file is a whole new ~9 MB
+blob in history, permanently.
+
+Repo size is now ~876 MB. Every file is under GitHub's 100 MB hard limit, but the repo is past
+GitHub's ~1 GB guidance, which is worth knowing before you add a remote.
 
 ### The server.properties problem
 
@@ -426,7 +479,7 @@ lsof -nP -iTCP:25565 -sTCP:LISTEN
 ```
 
 **`Failed to start the minecraft server` … `session.lock: already locked`**
-A server is *already running* and holding this world. Minecraft locks `world/session.lock` so two
+A server is *already running* and holding this world. Minecraft locks `current/session.lock` so two
 processes can never write the same chunks — this error is the safety mechanism working, not a
 corruption. The fix is one command:
 
@@ -454,7 +507,7 @@ you can type `stop` into — so it's easy to forget it's alive. Checking the por
 guard.
 
 If the lock persists with genuinely no server running (only after a hard crash or power loss), delete
-`world/session.lock` — it's regenerated on startup. Never delete it to bypass a live server.
+`current/session.lock` — it's regenerated on startup. Never delete it to bypass a live server.
 
 **`Failed to load eula.txt`**
 `eula.txt` still says `eula=false`. See step 5 of *Installing from scratch* above.

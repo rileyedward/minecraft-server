@@ -3,6 +3,7 @@ package com.rileyedward.smp;
 import com.rileyedward.smp.core.Feature;
 import com.rileyedward.smp.features.wand.WandFeature;
 import com.rileyedward.smp.features.welcome.WelcomeFeature;
+import com.rileyedward.smp.features.worlds.WorldsFeature;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.util.ArrayList;
@@ -29,7 +30,8 @@ public final class SmpPlugin extends JavaPlugin {
      */
     private static final List<Supplier<Feature>> FEATURES = List.of(
             WelcomeFeature::new,
-            WandFeature::new
+            WandFeature::new,
+            WorldsFeature::new
     );
 
     private final List<Feature> active = new ArrayList<>();
