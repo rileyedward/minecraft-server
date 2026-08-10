@@ -9,6 +9,11 @@ almost any plugin.
 
 New to this? Read [Plugin Development Basics](plugin-development-basics.md) first.
 
+This same code now also ships as a real feature in
+[`WandFeature.java`](../custom-plugins/src/main/java/com/rileyedward/smp/features/wand/WandFeature.java) —
+that's the copy the server actually runs, and the one to edit if you want to change how the wand
+behaves. The sample below stays as the annotated reference.
+
 **What it does:** `/wand` gives you a glowing "Wand of Leaping". Right-click and you launch
 forward, trailing particles.
 

@@ -11,3 +11,7 @@
 features:
   # Custom join/quit messages and a welcome title.
   welcome: true
+
+  # /wand — a blaze rod that launches you forward on right-click.
+  # Requires the smp.wand permission; operators have it automatically.
+  wand: true

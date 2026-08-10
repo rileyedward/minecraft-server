@@ -1,6 +1,7 @@
 package com.rileyedward.smp;
 
 import com.rileyedward.smp.core.Feature;
+import com.rileyedward.smp.features.wand.WandFeature;
 import com.rileyedward.smp.features.welcome.WelcomeFeature;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -27,7 +28,8 @@ public final class SmpPlugin extends JavaPlugin {
      * nothing is built until onEnable() runs.
      */
     private static final List<Supplier<Feature>> FEATURES = List.of(
-            WelcomeFeature::new
+            WelcomeFeature::new,
+            WandFeature::new
     );
 
     private final List<Feature> active = new ArrayList<>();
