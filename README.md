@@ -242,3 +242,4 @@ The environment argument must be one of `NORMAL`, `NETHER`, `THE_END`, or `CUSTO
 | [The magic wand, explained](docs/magic-wand-explained.md)      | A worked example, walked through line by line                                       |
 | [Plugin ideas](docs/plugin-ideas.md)                           | A backlog of things worth building next                                             |
 | [Admin panel](docs/ADMIN-PANEL.md)                             | Design notes for a web management panel — not built yet                             |
+| [Speedrun world](docs/SPEEDRUN-WORLD.md)                       | Design notes for a resettable hardcore speedrun dimension — not built yet           |
