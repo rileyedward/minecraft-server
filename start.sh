@@ -10,6 +10,18 @@ source ./paper.env
 JAR="paper-${PAPER_MC_VERSION}-${PAPER_BUILD}.jar"
 PORT=25565
 
+# ── Heap ──────────────────────────────────────────────────────────────────────
+# Defaults are the production values. Override with environment variables rather
+# than by editing them here:
+#
+#   MC_HEAP_MIN=1G MC_HEAP_MAX=2G ./start.sh
+#
+# Why not just edit the numbers? This script is rsynced to the droplet on every
+# deploy (see docs/DEPLOYMENT.md), so a heap lowered for laptop testing would
+# silently follow it to production and starve the real server.
+HEAP_MIN="${MC_HEAP_MIN:-2G}"
+HEAP_MAX="${MC_HEAP_MAX:-4G}"
+
 if [ ! -f "$JAR" ]; then
   echo "Missing $JAR"
   echo
@@ -57,4 +69,5 @@ fi
 # `exec` replaces this shell with Java so signals (Ctrl+C, kill, stop.sh) reach
 # the server directly. Without it the script would be signalled and Java would
 # survive as an orphan still holding the world lock.
-exec java -Xms2G -Xmx4G -jar "$JAR" --nogui
+echo "Heap: -Xms$HEAP_MIN -Xmx$HEAP_MAX"
+exec java -Xms"$HEAP_MIN" -Xmx"$HEAP_MAX" -jar "$JAR" --nogui

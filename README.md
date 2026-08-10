@@ -105,6 +105,37 @@ Only one server can use the world at a time — Minecraft locks it so two proces
 same chunks. If one is already running, `./start.sh` tells you and offers to restart it instead of
 failing with a stack trace.
 
+### Testing on a laptop
+
+`start.sh` defaults to a 4 GB heap, which is sized for the droplet. On an 8 GB Mac that's half the
+machine, and macOS will swap — which is worse than it sounds, because garbage collection walks the
+whole heap and drags every swapped-out page back in. The symptom looks like server lag but is really
+the SSD.
+
+Override the heap with environment variables rather than editing the script:
+
+```bash
+MC_HEAP_MIN=2G MC_HEAP_MAX=2G ./start.sh
+```
+
+2 GB is plenty for one or two people testing. `start.sh` prints the heap it's using on every start,
+so you can see which one you got.
+
+**Don't edit the numbers inside `start.sh`.** It's rsynced to the droplet on every deploy, so a heap
+lowered for laptop testing would follow it to production.
+
+Two more things that help locally:
+
+- **`view-distance` and `simulation-distance` in `server.properties` are set to 6 and 5** rather than
+  the default 10, which roughly halves loaded chunks and cuts ticking work by about 70%. That file is
+  gitignored and never rsynced, so these stay local — production gets its own.
+- **Quit your browser while testing.** It'll do more for you than any JVM flag.
+
+One caveat if you're using local runs to make decisions: an M-series laptop has *better* single-core
+performance than a small cloud droplet, and Minecraft's tick loop is single-threaded. Local
+performance is optimistic — don't use it to pick a droplet tier. See
+[Cost optimization](docs/COST-OPTIMIZATION.md).
+
 ## Plugins
 
 Every plugin, yours or someone else's, is a `.jar` file in `plugins/`. The server scans that folder
