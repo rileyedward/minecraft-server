@@ -8,6 +8,8 @@ version = "1.0.0"
 repositories {
     mavenCentral()
     maven("https://repo.papermc.io/repository/maven-public/")
+    // Multiverse-Core's API. Not on Maven Central — this is its own repo.
+    maven("https://repo.onarandombox.com/content/groups/public")
 }
 
 // The Paper version lives in ../paper.env so the server jar and the API we
@@ -23,11 +25,21 @@ val paperApiVersion: String = paperEnv.readLines()
     ?.trim()
     ?: error("PAPER_API_VERSION not set in ${paperEnv.path}")
 
+// Must match the multiverse-core jar actually in plugins/. Unlike Paper this isn't
+// in paper.env, because paper.env is read by start.sh too and knows only about the
+// server itself.
+val multiverseVersion = "5.7.3"
+
 dependencies {
     // `compileOnly`, NOT `implementation`. The server already provides the Paper
     // API at runtime — bundling it would ship a second, conflicting copy of every
     // Bukkit class.
     compileOnly("io.papermc.paper:paper-api:$paperApiVersion")
+
+    // Same reasoning: Multiverse is a plugin already running on the server, so we
+    // compile against its API and let the running copy provide it. The speedrun
+    // feature needs it for WorldManager.regenWorld() — see docs/SPEEDRUN-WORLD.md.
+    compileOnly("org.mvplugins.multiverse.core:multiverse-core:$multiverseVersion")
 }
 
 tasks.withType<JavaCompile>().configureEach {

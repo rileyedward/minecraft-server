@@ -63,7 +63,10 @@ current/
 │   ├── old/               the previous realm — a whole extra world
 │   ├── oldest/            the earliest realm
 │   ├── oldest_nether/
-│   └── oldest_the_end/
+│   ├── oldest_the_end/
+│   ├── speedrun/          disposable — rebuilt from scratch on every death
+│   ├── speedrun_nether/
+│   └── speedrun_the_end/
 ├── data/                  maps, scoreboards, raids, villages
 ├── datapacks/             vanilla datapacks
 └── players/               one file per player: inventory, position, health, XP
@@ -76,6 +79,11 @@ Note the modern layout — every dimension lives *inside* `current/`. Older guid
 entry under `dimensions/minecraft/`, not as a folder beside `current/`. That makes backup simple —
 one folder is every world — but it also means `current/` is much larger than a single world's worth
 of data. See the Worlds section of the README for how the three realms are set up.
+
+The three `speedrun*` folders are the exception to "back up `current/` and you have everything":
+they're deliberately disposable and get destroyed and rebuilt on every death. They only exist once
+someone has run `/speedrun`. Excluding them from a backup is safe, and they are already excluded
+from git.
 
 Region files (`r.0.0.mca`) each hold a 32×32 chunk area. They grow as players explore and are
 never automatically pruned.

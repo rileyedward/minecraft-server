@@ -198,6 +198,34 @@ Each realm keeps its own inventory, XP, and health via Multiverse-Inventories. T
 `plugins/Multiverse-Inventories/groups.yml`: `current` shares with its nether and end, `oldest`
 shares with `oldest_nether` and `oldest_the_end`, and `old` stands alone.
 
+### The speedrun world
+
+Alongside the archived realms there's a disposable one: `speedrun`, plus its nether and end. One
+death ends the run for everyone and the world rebuilds itself on the spot.
+
+| Command | Does |
+| ------- | ---- |
+| `/speedrun` | Join the run, or start one if there isn't one |
+| `/speedrun leave` | Back to `current`, survival gear untouched |
+| `/speedrun reset` | Restart on a fresh random seed |
+| `/speedrun seed <seed>` | Restart on a chosen seed — a number, or any word |
+| `/speedrun status` | Seed, clock, who's in, server best |
+
+Gated behind `smp.speedrun`, which operators have automatically:
+
+```
+/lp group default permission set smp.speedrun true
+```
+
+Two things to know before using it. **Entering the run clears your run inventory** — that's the
+point, since otherwise leaving and rejoining is a way to fetch survival gear, and your `current`
+inventory is a separate Multiverse-Inventories profile that isn't touched. And **a reset freezes the
+server for a few seconds** while three worlds regenerate; that's a known cost of the current design,
+not a bug. Full reasoning in [docs/SPEEDRUN-WORLD.md](docs/SPEEDRUN-WORLD.md).
+
+These worlds are disposable and **not** committed to git — `current/*` is ignored wholesale and only
+the archived realms are re-included, so a regenerating world can't slip into a commit.
+
 ### Where the world data lives
 
 **On Paper 26.2, every world is a dimension of the default world's folder.** Importing a world named

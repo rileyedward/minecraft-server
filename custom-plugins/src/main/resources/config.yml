@@ -21,3 +21,14 @@ features:
   # To let everyone use them:
   #   /lp group default permission set smp.worlds true
   worlds: true
+
+  # /speedrun — a hardcore team speedrun world. One death ends the run for
+  # everyone and the world rebuilds itself; /speedrun reset does it on demand.
+  #
+  # Requires Multiverse-Core (it manages the worlds) and the smp.speedrun
+  # permission; operators have that automatically. To let everyone in:
+  #   /lp group default permission set smp.speedrun true
+  #
+  # Turning this off leaves the speedrun worlds on disk untouched — they just
+  # stop being reachable. See docs/SPEEDRUN-WORLD.md.
+  speedrun: true

@@ -4,3 +4,8 @@ main: com.rileyedward.smp.SmpPlugin
 api-version: '26.2'
 description: Custom features for this server.
 author: rileyedward
+
+# The speedrun feature calls Multiverse's WorldManager directly, so Multiverse has
+# to be enabled before this plugin is. `depend` guarantees that ordering; without it
+# MultiverseCoreApi.get() would sometimes run before MV had initialised.
+depend: [Multiverse-Core]

@@ -1,10 +1,100 @@
 # Hardcore Speedrun World
 
-Design notes for a resettable, team-hardcore speedrun dimension. Nothing here is built yet — this
-is the shape of the feature, the constraints it has to live inside, and the order to build it in.
+Design notes for a resettable, team-hardcore speedrun dimension, plus what actually got built.
+
+**Status: Phases 1 and 2 are built and deployed** as the `speedrun` feature in `custom-plugins/`.
+Phase 3 (double-buffering, Chunky pre-generation) is not. Start with [As built](#as-built) — it
+records the three places reality differed from the design below, and reading the design first will
+teach you two things that turned out to be wrong.
 
 Written to be picked up cold: everything a fresh session needs to know about this server is in the
 [Ground truth](#ground-truth) section, so you shouldn't need to rediscover it.
+
+---
+
+## As built
+
+### Three findings that changed the design
+
+**1. Multiverse has a Java API, and it has `regenWorld`.** The design below reaches for
+`Bukkit.dispatchCommand(..., "mv create ...")`. Don't — Multiverse-Core 5.7.3 ships a real API:
+
+```java
+MultiverseCoreApi.get().getWorldManager()
+    .regenWorld(RegenWorldOptions.world(loaded)
+        .seed(seed)
+        .keepWorldConfig(true)      // per-world difficulty and gamemode survive the reset
+        .keepGameRule(true));       // → Attempt<LoadedMultiverseWorld, RegenFailureReason>
+```
+
+`regenWorld` tears a world down and rebuilds it **under the same name**, and that one property
+deletes most of the scope below:
+
+- **The "highest-risk unknown" evaporates.** The design worried about whether Multiverse-Inventories
+  copes with a world deleted and recreated under a new name. The name never changes, so its
+  `groups.yml` entry is stable and the question never arises.
+- **No `speedrun_a` / `speedrun_b` alternation.** The worlds are just `speedrun`, `speedrun_nether`,
+  `speedrun_the_end` — which is exactly what `world-name-format` needs for portals to link. The
+  naming note under [The reset freeze](#3-the-reset-freeze-and-the-trick-that-fixes-it) only applies
+  if you later add the Phase 3 spare set.
+- **Disk churn is structural, not a chore.** Nothing is orphaned, so there is no accumulation to
+  clean up.
+- Failures are typed (`DELETE_FAILED` / `CREATE_FAILED`) instead of needing to be read out of chat.
+
+**2. `dispatchCommand` is actively broken for the destructive Multiverse commands on this server.**
+`plugins/Multiverse-Core/config.yml` has `confirm-mode: enable` and `use-confirm-otp: true`. A
+console `mv delete` does not delete — it queues and replies:
+
+```
+Are you sure you want to delete world 'zz_layout_probe'?
+Run /mv confirm 649 to continue. This will expire in 30 seconds.
+```
+
+A plugin has no reasonable way to read that three-digit number back. The `mv load` call in
+`WorldsFeature` is unaffected (loading isn't a "dangerous action"), so that precedent still stands
+for loading — but not for anything that destroys a world. The API skips the queue entirely, so no
+Multiverse config change was needed.
+
+**3. The `.gitignore` gotcha was already handled.** The design says a rule is needed. It isn't:
+`current/dimensions/minecraft/*` ignores everything and only the four archived realms are
+re-included. Verified against a real Multiverse-created world — it lands in
+`current/dimensions/minecraft/`, and `git check-ignore` reports it ignored. Still worth a `git
+status` after your first reset, but there is nothing to add.
+
+### Behaviour that was chosen
+
+| Question (from [Settle these](#settle-these-before-building)) | Decision |
+|---|---|
+| Death scope | Deaths **inside the speedrun set only**. Dying in `current` or `oldest` never ends a run. |
+| Grace period | Broadcast the cause, dead player → spectator, **10-second countdown**, then reset. A manual `/speedrun reset` skips it. |
+| Who can reset | Anyone with `smp.speedrun`. Ops pass automatically. |
+| Run goal | **Ender Dragon kill.** Real-time clock, personal and server bests persisted. |
+| Timer | Real time, per speedrun convention. |
+
+### The classes
+
+`custom-plugins/src/main/java/com/rileyedward/smp/features/speedrun/`
+
+| Class | Responsibility |
+|---|---|
+| `SpeedrunFeature` | `Feature` impl — the command, the death listener, the dragon listener |
+| `RunManager` | State machine, participants, timer, reset orchestration |
+| `WorldSet` | The trio of worlds. The only class that touches Multiverse |
+| `PlayerScrub` | Resetting one player to a legal run-start state |
+| `RunRecords` | Best times in `plugins/CustomPlugins/speedrun.yml` |
+
+### Two things that will bite whoever edits this next
+
+**Scrubbing is delayed, and that delay is load-bearing.** Multiverse-Inventories loads the player's
+speedrun profile on world change and Multiverse applies the per-world gamemode a tick later
+(`gamemode-and-flight-enforce-delay: 1`). A scrub inside that window is silently overwritten by
+both — it appears to work, then quietly undoes itself. `RunManager.SCRUB_DELAY_TICKS` exists for
+this and should not be lowered to zero.
+
+**`PlayerScrub` refuses to run outside a speedrun world, on purpose.** A reset moves players out
+through `current`, which means their real survival inventory is briefly loaded. A scrub firing at
+the wrong moment would clear *that*, with no undo. The guard lives inside `scrub()` rather than
+being every caller's responsibility. Don't move it out.
 
 ---
 
@@ -42,6 +132,7 @@ Facts about this server that shape the design. Verify anything marked ⚠ before
 | Chunky | 1.5.3 — already installed, and the tool for background pre-generation |
 | Permissions | LuckPerms. This plugin's convention is `smp.<feature>`; ops pass automatically. |
 | Default world | `level-name=current` |
+| MV confirmations | `confirm-mode: enable` + `use-confirm-otp: true` — destructive `mv` **commands** demand `/mv confirm <otp>`. Use the API instead. |
 
 **Where worlds live.** On Paper 26.2 every world is a *dimension inside the default world's folder*,
 not a sibling directory:
@@ -146,7 +237,16 @@ probably split into:
 | `WorldSetLifecycle` | Create / load / unload / delete a named trio of worlds |
 | `PlayerScrub` | Resetting a player to a legal run-start state |
 
+This survived almost intact. As built, `WorldSetLifecycle` is called `WorldSet` and there's a fifth
+class, `RunRecords`, for best times — see [The classes](#the-classes).
+
 ### World lifecycle: prefer dispatching Multiverse commands
+
+> **Superseded — see [As built](#as-built), finding 1 and 2.** The instinct here is right
+> (Multiverse should stay the single owner of world state) but the mechanism is wrong. Use
+> `MultiverseCoreApi.get().getWorldManager()`. Dispatching `mv delete` on this server hits the
+> `/mv confirm <otp>` queue and silently does nothing. Kept below because the reasoning about
+> *ownership* is still the reason the API is the right choice.
 
 `WorldsFeature` already dispatches `mv load <name>` rather than calling `WorldCreator` directly, so
 that Multiverse stays the single owner of world state. Follow that precedent:
@@ -206,9 +306,10 @@ Give the speedrun set **its own Multiverse-Inventories group** in
 `plugins/Multiverse-Inventories/groups.yml`, alongside the existing `default` / `oldest` / `old`
 groups. Without it, gear leaks between your survival realm and the run.
 
-⚠ Open question: whether MV-Inventories copes gracefully with a world that is deleted and recreated
-under a new name on every reset. Worth testing early — if it holds stale data per world name, the
-scrub step has to compensate. This is the highest-risk unknown in the design.
+~~⚠ Open question: whether MV-Inventories copes gracefully with a world that is deleted and recreated
+under a new name on every reset.~~ **Resolved, and it stopped being a question.** Because
+`regenWorld` reuses the world name, there is no rename for MV-Inventories to cope with — the group
+entry is written once and stays correct. See [As built](#as-built), finding 1.
 
 ---
 
@@ -231,6 +332,10 @@ Permission `smp.speedrun`, matching the `smp.*` convention. Ops pass automatical
 ---
 
 ## Build order
+
+> **Phases 1 and 2 are done.** Phase 3 is not, and the advice at the bottom of this section still
+> holds — play it before building the double-buffer. If the reset freeze turns out to be tolerable,
+> Phase 3 is work you never have to do.
 
 **Phase 1 — prove the format is fun (~2 hours).** Overworld only, blocking reset, no
 double-buffering, no pre-generation. `/speedrun`, `/speedrun reset`, death listener, player scrub.
@@ -256,10 +361,11 @@ whether the whole idea earns its keep.
   worlds. Fresh worlds are small, and `old`/`oldest` are `auto-load: false` so they cost nothing
   until visited — but do not raise `-Xmx` past 4G to compensate, that starves macOS. If it's tight,
   drop the double-buffer's nether and end and pre-generate only the overworld.
-- **`.gitignore` needs a rule.** New worlds land inside `current/`, which uses fussy nested
-  unignore rules so the archived realms stay tracked. A `speedrun*` world must **not** get caught by
-  those. Check with `git check-ignore -q <path>` before the first commit after building this —
-  silently committing a regenerating world would be miserable.
+- ~~**`.gitignore` needs a rule.**~~ **It didn't.** New worlds land inside `current/`, whose nested
+  unignore rules re-include only the four archived realms by name — so a `speedrun*` world is
+  ignored by the existing `current/dimensions/minecraft/*` line. Verified with a real
+  Multiverse-created world. The `git check-ignore -q <path>` habit is still worth keeping, but
+  there is no rule to add.
 - **Disk churn.** Every abandoned run leaves a world folder until deleted. Make deletion part of the
   reset path, not a cleanup task someone remembers to run.
 - **Seeds.** Random per reset by default. Record the seed of each run so a good one can be replayed
@@ -275,6 +381,11 @@ whether the whole idea earns its keep.
 
 ## Settle these before building
 
+> **All five are settled** — the answers are in the table under
+> [Behaviour that was chosen](#behaviour-that-was-chosen). The questions are kept because each one
+> is a genuine fork, and if you change your mind about any of them this is the list of what you'd be
+> changing.
+
 1. **Death scope** — does *any* death reset the run, or only deaths of players currently in the
    speedrun world? (Someone dying in `current` shouldn't end a run.)
 2. **Grace period** — instant reset on death, or a countdown with a chance to see what happened?
@@ -288,16 +399,48 @@ whether the whole idea earns its keep.
 
 ## Verification
 
-1. `cd custom-plugins && ./gradlew deploy`, restart, confirm the feature count in
-   `logs/latest.log` goes up and no exception is thrown on enable.
-2. `/speedrun` — you're teleported into a fresh world, survival, empty inventory, no advancements.
-3. `/mv list` — the speedrun set appears; the archived realms are untouched.
-4. Die on purpose. The run resets, everyone in the run moves to a new world, inventories are clear.
-5. Have two players die in the same tick — confirm **one** reset happens, not two.
-6. `/speedrun leave`, then `/current` — your survival inventory is intact and unaffected.
-7. `git status` — no world data staged.
-8. Run several resets in a row, then check `du -sh current/dimensions/minecraft/` to confirm old
-   run folders are actually being deleted rather than accumulating.
+### Done
+
+1. `./gradlew clean build` — compiles against `paper-api` and the Multiverse API with no warnings.
+2. `./gradlew deploy` and restart — `Enabled 4 feature(s)` (was 3), no exception on enable.
+3. Multiverse-Core enables *before* CustomPlugins, so `MultiverseCoreApi.get()` is safe. This is what
+   `depend: [Multiverse-Core]` in `plugin.yml` buys.
+4. `/speedrun status`, an unknown subcommand, and `/speedrun seed` with no argument all respond
+   correctly from the console.
+5. A Multiverse-created world lands in `current/dimensions/minecraft/` and `git check-ignore`
+   reports it ignored. `git status` stages no world data.
+6. `mv list` shows the archived realms untouched.
+
+### Still needs a player
+
+Everything above was checked from the console. The paths below need someone actually logged in —
+`/speedrun` requires a player sender, so world creation has never run.
+
+1. `/speedrun` — you're teleported into a fresh world: survival, empty inventory, no advancements,
+   full health. Watch `logs/latest.log` while it builds three worlds for the first time.
+2. `/mv list` — `speedrun`, `speedrun_nether`, `speedrun_the_end` appear. `/mv info speedrun` shows
+   difficulty `hard` and gamemode `survival`.
+3. Walk through a nether portal — you arrive in `speedrun_nether`, not `current_nether`. This is what
+   proves the `world-name-format` naming convention is doing its job.
+4. Create the inventory group, once, after the worlds exist:
+   `/mvinv group create speedrun`, then `/mvinv group addworld speedrun <each of the three>`, then
+   `/mvinv group addshare speedrun all`.
+5. Die on purpose. The cause is broadcast, you go to spectator, the countdown runs, then everyone in
+   the run lands in a fresh world with cleared state. Then die in `speedrun_nether` — same result,
+   which is what confirms the listener covers the whole set.
+6. **Have two players die in the same tick — confirm one reset, not two.** The highest-value test
+   here. Easiest reproduction is `/kill` on both from the console in one go.
+7. `/speedrun leave`, then `/current` — your survival inventory, XP and advancements are exactly as
+   they were. **Do this with a genuinely stocked inventory before trusting the feature**, because
+   this is the one failure mode that loses real work.
+8. Have someone die in `current` while a run is live — the run must be unaffected.
+9. Kill the dragon — the completion broadcast fires and `plugins/CustomPlugins/speedrun.yml` gains a
+   best time.
+10. Run five resets in a row, then `du -sh current/dimensions/minecraft/` — the total should be flat.
+    Regen reuses the folder, so growth means something is being orphaned.
+
+While doing step 10, time the freeze. If it's bad enough to be unpleasant, that's the signal to
+build Phase 3 — and if it isn't, that's Phase 3 you never have to write.
 
 ---
 
